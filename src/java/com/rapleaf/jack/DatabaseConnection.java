@@ -16,6 +16,8 @@ package com.rapleaf.jack;
 
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.Map;
@@ -47,11 +49,29 @@ public class DatabaseConnection extends BaseDatabaseConnection {
   public DatabaseConnection(String dbname_key, long expiration) {
     Map<String, String> db_info = null;
     try {
-      // load database info from config folder
-      Map env_info = (Map)YAML.load(new FileReader("config/environment.yml"));
+
+      // load database environment info, checking first in the jar and second in the filesystem
+      Map env_info = null;
+
+      InputStream envYamlResource =
+          this.getClass().getClassLoader().getResourceAsStream("config/environment.yml");
+      if (envYamlResource != null) {
+        env_info = (Map)YAML.load(new InputStreamReader((envYamlResource)));
+      } else {
+        env_info = (Map)YAML.load(new FileReader("config/environment.yml"));
+      }
+
       String db_info_name = (String)env_info.get(dbname_key);
-      Map db_info_container = (Map)YAML.load(new FileReader("config/database.yml"));
-      db_info = (Map<String, String>)db_info_container.get(db_info_name);
+
+      InputStream dbYamlResource =
+          this.getClass().getClassLoader().getResourceAsStream("config/database.yml");
+      if (dbYamlResource != null) {
+        db_info =
+            (Map<String, String>) ((Map) YAML.load(new InputStreamReader(dbYamlResource))).get(db_info_name);
+      } else {
+        Map db_info_container = (Map)YAML.load(new FileReader("config/database.yml"));
+        db_info = (Map<String, String>)db_info_container.get(db_info_name);
+      }
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
