@@ -42,29 +42,26 @@ public class DatabaseConnection extends BaseDatabaseConnection {
 
   private static final long DEFAULT_EXPIRATION = 14400000; // 4 hours
 
-  public DatabaseConnection(String dbname_key) throws RuntimeException {
-    this(dbname_key, DEFAULT_EXPIRATION);
-  }
-  
-  public DatabaseConnection(String dbname_key, long expiration) {
-    Map<String, String> db_info = null;
-    try {
 
+
+  private static Map<String, String> parseDbYaml(String dbKey) {
+    try {
       // load database environment info, checking first in the jar and second in the filesystem
       Map env_info = null;
 
       InputStream envYamlResource =
-          this.getClass().getClassLoader().getResourceAsStream("config/environment.yml");
+          DatabaseConnection.class.getClassLoader().getResourceAsStream("config/environment.yml");
       if (envYamlResource != null) {
         env_info = (Map)YAML.load(new InputStreamReader((envYamlResource)));
       } else {
         env_info = (Map)YAML.load(new FileReader("config/environment.yml"));
       }
 
-      String db_info_name = (String)env_info.get(dbname_key);
+      String db_info_name = (String)env_info.get(dbKey);
 
+      Map db_info = null;
       InputStream dbYamlResource =
-          this.getClass().getClassLoader().getResourceAsStream("config/database.yml");
+          DatabaseConnection.class.getClassLoader().getResourceAsStream("config/database.yml");
       if (dbYamlResource != null) {
         db_info =
             (Map<String, String>) ((Map) YAML.load(new InputStreamReader(dbYamlResource))).get(db_info_name);
@@ -72,12 +69,27 @@ public class DatabaseConnection extends BaseDatabaseConnection {
         Map db_info_container = (Map)YAML.load(new FileReader("config/database.yml"));
         db_info = (Map<String, String>)db_info_container.get(db_info_name);
       }
+      return db_info;
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
 
+  public DatabaseConnection(String dbname_key) throws RuntimeException {
+    this(dbname_key, DEFAULT_EXPIRATION);
+  }
+  
+  public DatabaseConnection(String dbname_key, long expiration) {
+    this(parseDbYaml(dbname_key), expiration);
+  }
+
+  public DatabaseConnection(Map<String, String> dbConfig) throws RuntimeException {
+    this(dbConfig, DEFAULT_EXPIRATION);
+  }
+
+  public DatabaseConnection(Map<String, String> dbConfig, long expiration) {
     // get server credentials from database info
-    String adapter = db_info.get("adapter");
+    String adapter = dbConfig.get("adapter");
     String driver;
     if (adapter.equals("mysql") || adapter.equals("mysql_replication")) {
       driver = "mysql";
@@ -90,14 +102,14 @@ public class DatabaseConnection extends BaseDatabaseConnection {
       throw new IllegalArgumentException("Don't know the driver for adapter '" + adapter + "'!");
     }
     StringBuilder connectionStringBuilder = new StringBuilder("jdbc:");
-    connectionStringBuilder.append(driver).append("://").append(db_info.get("host"));
-    if (db_info.containsKey("port")) {
-      connectionStringBuilder.append(":").append(Integer.parseInt(db_info.get("port")));
+    connectionStringBuilder.append(driver).append("://").append(dbConfig.get("host"));
+    if (dbConfig.containsKey("port")) {
+      connectionStringBuilder.append(":").append(Integer.parseInt(dbConfig.get("port")));
     }
-    connectionStringBuilder.append("/").append(db_info.get("database"));
+    connectionStringBuilder.append("/").append(dbConfig.get("database"));
     connectionString = connectionStringBuilder.toString();
-    username = db_info.get("username");
-    password = db_info.get("password");
+    username = dbConfig.get("username");
+    password = dbConfig.get("password");
 
     this.expiration = expiration;
     updateExpiration();
