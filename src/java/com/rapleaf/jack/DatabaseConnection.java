@@ -40,21 +40,24 @@ public class DatabaseConnection extends BaseDatabaseConnection {
 
   private static final long DEFAULT_EXPIRATION = 14400000; // 4 hours
 
+  private static Map<String, String> parseDbYaml(String dbKey) {
+    try {
+      // load database info from config folder
+      Map env_info = (Map)YAML.load(new FileReader("config/environment.yml"));
+      String db_info_name = (String)env_info.get(dbKey);
+      Map db_info_container = (Map)YAML.load(new FileReader("config/database.yml"));
+      return (Map<String, String>)db_info_container.get(db_info_name);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   public DatabaseConnection(String dbname_key) throws RuntimeException {
     this(dbname_key, DEFAULT_EXPIRATION);
   }
   
   public DatabaseConnection(String dbname_key, long expiration) {
-    Map<String, String> db_info = null;
-    try {
-      // load database info from config folder
-      Map env_info = (Map)YAML.load(new FileReader("config/environment.yml"));
-      String db_info_name = (String)env_info.get(dbname_key);
-      Map db_info_container = (Map)YAML.load(new FileReader("config/database.yml"));
-      db_info = (Map<String, String>)db_info_container.get(db_info_name);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    Map<String, String> db_info = parseDbYaml(dbname_key);
 
     // get server credentials from database info
     String adapter = db_info.get("adapter");
